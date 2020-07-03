@@ -12,6 +12,7 @@ enum SSD1325Model {
   SSD1325_MODEL_128_64,
   SSD1325_MODEL_96_16,
   SSD1325_MODEL_64_48,
+  SSD1327_MODEL_128_128,
 };
 
 class SSD1325 : public PollingComponent, public display::DisplayBuffer {
@@ -27,14 +28,14 @@ class SSD1325 : public PollingComponent, public display::DisplayBuffer {
   void set_external_vcc(bool external_vcc) { this->external_vcc_ = external_vcc; }
 
   float get_setup_priority() const override { return setup_priority::PROCESSOR; }
-  void fill(int color) override;
+  void fill(Color color) override;
 
  protected:
   virtual void command(uint8_t value) = 0;
   virtual void write_display_data() = 0;
   void init_reset_();
 
-  void draw_absolute_pixel_internal(int x, int y, int color) override;
+  void draw_absolute_pixel_internal(int x, int y, Color color) override;
 
   int get_height_internal() override;
   int get_width_internal() override;
