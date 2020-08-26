@@ -1,5 +1,6 @@
 import collections
 import importlib
+import pathlib
 import logging
 import re
 import os.path
@@ -109,11 +110,38 @@ class ComponentManifest:
 CORE_COMPONENTS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'components'))
 _UNDEF = object()
 CUSTOM_COMPONENTS_PATH = _UNDEF
+EXTRA_COMPONENTS_PATH = os.getenv('EXTRA_COMPONENTS_PATH', _UNDEF)
 
+
+
+
+def _import_module(expdir: pathlib.Path):
+    """
+    @TODO: Docs. Contribution is welcome
+    """
+    # @TODO: better PYTHONPATH handling
+    if not isinstance(expdir, pathlib.Path):
+        expdir = pathlib.Path(expdir)
+    sys.path.insert(0, str(expdir.absolute()))
+    sys.path.insert(0, os.path.dirname(str(expdir.absolute())))
+    s = importlib.util.spec_from_file_location(
+        expdir.name,
+        str(expdir.absolute() / "__init__.py"),
+        submodule_search_locations=[expdir.absolute()],
+    )
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    sys.modules[expdir.name] = m
+    return m 
 
 def _mount_config_dir():
     global CUSTOM_COMPONENTS_PATH
-    if CUSTOM_COMPONENTS_PATH is not _UNDEF:
+    global EXTRA_COMPONENTS_PATH
+    if EXTRA_COMPONENTS_PATH is not _UNDEF:
+        extra_path = os.path.abspath(EXTRA_COMPONENTS_PATH)
+        sys.path.insert(0, extra_path)
+    if CUSTOM_COMPONENTS_PATH is not _UNDEF:        
+        sys.path.insert(0, CUSTOM_COMPONENTS_PATH)
         return
     custom_path = os.path.abspath(os.path.join(CORE.config_dir, 'custom_components'))
     if not os.path.isdir(custom_path):
@@ -123,12 +151,12 @@ def _mount_config_dir():
         sys.path.insert(0, CORE.config_dir)
     CUSTOM_COMPONENTS_PATH = custom_path
 
-
 def _lookup_module(domain, is_platform):
     if domain in _COMPONENT_CACHE:
         return _COMPONENT_CACHE[domain]
 
     _mount_config_dir()
+
     # First look for custom_components
     try:
         module = importlib.import_module(f'custom_components.{domain}')
@@ -151,12 +179,31 @@ def _lookup_module(domain, is_platform):
     except ImportError as e:
         if 'No module named' not in str(e):
             _LOGGER.error("Unable to import component %s:", domain, exc_info=True)
-        return None
     except Exception:  # pylint: disable=broad-except
         _LOGGER.error("Unable to load component %s:", domain, exc_info=True)
         return None
     else:
         manif = ComponentManifest(module, CORE_COMPONENTS_PATH, is_platform=is_platform)
+        _COMPONENT_CACHE[domain] = manif
+        return manif
+
+
+    # Look for extra components
+    try:        
+        extra_path = os.path.abspath(EXTRA_COMPONENTS_PATH)
+        module = _import_module(os.path.join(extra_path,domain))
+    except ImportError as e:
+        # ImportError when no such module
+        if 'No module named' not in str(e):
+            _LOGGER.warning("Unable to import custom component %s:", domain, exc_info=True)
+            return None
+    except Exception:  # pylint: disable=broad-except
+        # Other error means component has an issue
+        _LOGGER.error("Unable to load custom component %s:", domain, exc_info=True)
+        return None
+    else:
+        # Found in custom components
+        manif = ComponentManifest(module, EXTRA_COMPONENTS_PATH, is_platform=is_platform)
         _COMPONENT_CACHE[domain] = manif
         return manif
 
