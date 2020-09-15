@@ -136,12 +136,11 @@ def _import_module(expdir: pathlib.Path):
 
 def _mount_config_dir():
     global CUSTOM_COMPONENTS_PATH
-    global EXTRA_COMPONENTS_PATH
-    if EXTRA_COMPONENTS_PATH is not _UNDEF:
-        extra_path = os.path.abspath(EXTRA_COMPONENTS_PATH)
-        sys.path.insert(0, extra_path)
+    # global EXTRA_COMPONENTS_PATH
+    # if EXTRA_COMPONENTS_PATH is not _UNDEF:
+        # extra_path = os.path.abspath(EXTRA_COMPONENTS_PATH)
+        # sys.path.insert(0, extra_path)
     if CUSTOM_COMPONENTS_PATH is not _UNDEF:        
-        sys.path.insert(0, CUSTOM_COMPONENTS_PATH)
         return
     custom_path = os.path.abspath(os.path.join(CORE.config_dir, 'custom_components'))
     if not os.path.isdir(custom_path):
@@ -179,6 +178,7 @@ def _lookup_module(domain, is_platform):
     except ImportError as e:
         if 'No module named' not in str(e):
             _LOGGER.error("Unable to import component %s:", domain, exc_info=True)
+            # return None
     except Exception:  # pylint: disable=broad-except
         _LOGGER.error("Unable to load component %s:", domain, exc_info=True)
         return None
@@ -186,7 +186,6 @@ def _lookup_module(domain, is_platform):
         manif = ComponentManifest(module, CORE_COMPONENTS_PATH, is_platform=is_platform)
         _COMPONENT_CACHE[domain] = manif
         return manif
-
 
     # Look for extra components
     try:        
